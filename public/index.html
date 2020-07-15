@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Scrape search backlinks</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script src="./app.js" defer></script>
+</head>
+<body>
+<div class="container pt-5">
+<div class="shadow jumbotron rounded">
+
+    <h5>Backlinks Search</h5>
+    <form id='form1' action="/">
+        Search exact term (Verbatim) from google.com: 
+        <input type="text" name="searchKey" value="symphysismarketing.com" style="width:25%;">
+    </form>
+    <button id='button1' class="btn btn-primary mt-3 mb-3">Search</button>
+	<hr>
+    <div id='result-list'></div>
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,55 @@
+// to begin this project
+mkdir backlinks
+cd backlinks
+code .
+npm init -y
+npm install express puppeteer body-parser node-fetch cors --save
+npm install nodemon --save-dev
+
+// in package.json
+    "start-dev": "nodemon server"
+
+// create basic back end and front end directories and files
+mkdir server
+touch server/index.js
+mkdir public
+touch public/app.js public/index.html
+
+// server/index.js
+// After installed all packages, create ROOT and POST routes,
+// ROOT route just be there, 
+// POST route takes form input request and response back its input for now,
+// should be able to test with Postman.
+
+// public/app.js
+// Access index.html form, on form submit, fetch a post request to backend index.js,
+// get JSON object response back as array of form input for now,
+// append response as HTML list below.
+
+// public/index.html
+// Access app.js, build a form with 3 input fields, a button, and a empty div,
+// result will later append to empty div.
+
+// run the server
+npm run start-dev
+
+// Without front end is ok, this is a back end only project that produce JSON result,
+// This front end got redirected the path is for testing, everything can be test with Postman.
+
+// upload to github as first milestone
+echo "# backlinks" >> README.md
+touch .gitignore
+    // add 2 lines
+    # dependencies
+    /node_modules
+    node_modules/
+git init
+git add .
+git commit -m "first commit, basic server with form POST"
+git remote add origin https://github.com/fruit13ok/backlinks.git
+git push -u origin master
+
+// if .gitignore not working, having upload project too large error,
+// delete node_modules folder, push again,
+// if still not work, delete .git folder too, try again.
+// Remember to npm i before next run, might need to click refresh in folder explorer.
