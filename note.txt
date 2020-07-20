@@ -53,3 +53,61 @@ git push -u origin master
 // delete node_modules folder, push again,
 // if still not work, delete .git folder too, try again.
 // Remember to npm i before next run, might need to click refresh in folder explorer.
+
+/////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
+
+// I do search with url and param, not use puppeteer to step through each search action,
+// because google.com use Angular to automatically generate elements,
+// also it is harder to deal with shadow-dom.
+
+// my approach to this scrape task
+// 1). start from URL and DOM to select backlinks
+
+// 1.1). google url search with verbatim to display result
+https://www.google.com/search?q=symphysismarketing.com&tbs=li:1&start=0
+// formated as:
+domain name                         https://www.google.com
+path                                /search?
+1st param, search value             q=symphysismarketing.com
+    user input:     symphysismarketing.com
+and                                 &
+2nd param, enable verbatim          tbs=li:1
+and                                 &
+3nd param, pagination               start=0
+    loop to check no more result:   0
+        EX:
+        when start=n selectquery return empty array
+
+// 1.2). DOM query select backlinks
+let elements = document.querySelectorAll('#rso > .g > .rc > .r > a');
+// formated as:
+// parent element is important to exclude other children with .g .rc .r ...etc
+parent div with id="rso"
+    children div with class="g"
+        children div with class="rc"
+            children div with class="r"
+                children anchor tag
+
+//
+
+////////////////////// to bypass recaptcha ///////////////////////
+// resouces that I found
+https://stackoverflow.com/questions/55678095/bypassing-captchas-with-headless-chrome-using-puppeteer
+https://github.com/intoli/user-agents
+https://github.com/skratchdot/random-useragent
+
+// I use npm packages "user-agents"
+https://github.com/intoli/user-agents
+
+
+// I use proxy server to mask my ip too
+
+
+//////////// as for 7-19-2020 version recaptcha remain an issue /////////////
+// this version the way I open each result pages by page.goto() different url
+// url differ by parameter start=NUMBER, 1st 0, then increase by 10 each loop
+// until no more result found on the page
+
+// next version I will try "find / click the next button, until no more next button"
+
