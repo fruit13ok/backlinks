@@ -2,22 +2,39 @@
 
 // native
 const path = require('path');
+const https = require('https');
 
 // 3rd party
 const express = require('express');
 const puppeteer = require('puppeteer');
+const cors = require('cors');
 const bodyParser = require('body-parser');
 const fetch = require("node-fetch");
+const AbortController = require('abort-controller');
+// random user info for frequent request / recaptcha
 var userAgent = require('user-agents');
 var random_useragent = require('random-useragent');
 
 // local
 const app = express();
+const controller = new AbortController();
 const port = process.env.PORT || 8000;
+
+// [SOLUTION] to node-fetch problem, work together with abort request, and catch block,
+// FetchError Hostname/IP does not match certificate's altnames ERR_TLS_CERT_ALTNAME_INVALID
+// TypeError ERR_INVALID_PROTOCOL
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = false;
+process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0;
+const agent = new https.Agent({
+    rejectUnauthorized: false,
+    // keepAlive: true,
+    // maxSockets: 100,
+});
 
 // MIDDLEWARE
 app.use(express.static(path.join(__dirname, '../public')));
 app.use('/css', express.static(__dirname + '../node_modules/bootstrap/dist/css'));
+app.use(cors());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
@@ -34,29 +51,83 @@ app.listen(port, () => {
 });
 
 // helper functions
-// check URL status code
-let checkUrl = async (url) => {
-    try {
-        const response = await fetch(url);
-        const status = await response.status;
-        return status.toString();
-    }catch (error) {
-        console.log("fetch error: ",error);
-        // return error;
-        return "598";
+
+// convert to start with https://
+const tohttps = (url) => {
+    let newurl;
+    if(url.startsWith('https://www.')){
+        newurl='https://'+url.slice(12);
+    }else if(url.startsWith('https://')){
+        newurl=url;
+    }else if(url.startsWith('http://www.')){
+        newurl='https://'+url.slice(11);
+    }else if(url.startsWith('http://')){
+        newurl='https://'+url.slice(7);
+    }else if(url.startsWith('www.')){
+        newurl='https://'+url.slice(4);
+    }else{
+        newurl='https://'+url;
     }
+    // console.log(newurl);
+    return newurl;
 };
 
-// return result array of objects
-let forLoop = async (resultArr) => {
-    let resultArray = [];
-    for (let i = 0; i < resultArr.length; i++) {
-        let curUrl = resultArr[i];
-        let curStatus = await checkUrl(curUrl);
-        resultArray.push({url: curUrl, status: curStatus});
-    }
-    return resultArray;
-}
+// return single promise result as array of objects
+const urlLoop = async (urls) => {
+    // wait for non-responsive url for at least 1 second, 
+    // less than that could mistreat good url
+    let waitTime = 10000;
+    setTimeout(() => { controller.abort(); }, waitTime);
+    // check URL status code return array of fetches promise
+    let checkUrl = urls.map(url => fetch(tohttps(url), {
+        signal: controller.signal,
+        agent: agent
+      })
+      .then(function(response) {
+        if (response.status.toString() == '999') {
+            return {url: url, status: '999 not permit scanning'};
+        }
+        else {
+            return {url: url, status: response.status.toString()};
+        }
+      })
+      .catch(function(error) {
+        if (error.name === 'AbortError') {
+            // console.log('Got AbortError', url)
+            return {url: url, status: "408 Request Timeout"};
+        }
+        else if (error.name === 'FetchError' && error.code === 'EPROTO'){
+            // console.log('Got FetchError', url)
+            return {url: url, status: "200 http only"};
+        }
+        else if (error.name === 'FetchError' && error.code === 'ECONNRESET'){
+            // console.log('Got FetchError', url)
+            return {url: url, status: "408 Connection Reset"};
+        }
+        else if (error.name === 'FetchError' && error.code === 'ECONNREFUSED'){
+            // console.log('Got FetchError', url)
+            return {url: url, status: "503 Service Unavailable"};
+        }
+        else if (error.name === 'FetchError' && error.code === 'ENOTFOUND'){
+            // console.log('Got FetchError', url)
+            return {url: url, status: "404 Not Found"};
+        }
+        else if (error.name === 'TypeError' || error.name === 'TypeError [ERR_INVALID_PROTOCOL]'){
+            // console.log('Got TypeError', url)
+            return {url: url, status: "200"};
+        }
+        else {
+            console.log("my error:",error);
+            // console.log("my url:",url);
+            throw error;
+        }
+      })
+    );
+    // loop over array of all promises resolves them, 
+    // return single promise as array result
+    let results = await Promise.all(checkUrl);
+    return results;
+};
 
 // not in use
 // don't know why check and add unique result increase recaptcha to appear
@@ -95,44 +166,50 @@ let removeDuplicateResult = (allResult) => {
 }
 
 // scrape
-let scrape = async (searchKey, startResultNum) => {
-    const blockedResourceTypes = ['image','media','font','stylesheet'];
-    let BASE_URL = `https://www.google.com/search?q=${searchKey}&tbs=li:1&start=${startResultNum}`;
-    // let BASE_URL = `https://www.google.com/search?q=${searchKey}&tbs=li:1&num=100`;
-    // const browser = await puppeteer.launch({args: ['--proxy-server=50.235.149.74:8080', '--no-sandbox', '--disable-setuid-sandbox', '--blink-settings=imagesEnabled=false']});
-    const browser = await puppeteer.launch({args: ['--no-sandbox', '--disable-setuid-sandbox', '--blink-settings=imagesEnabled=false']});
-    // const browser = await puppeteer.launch({ headless: false, args: ['--proxy-server=50.235.149.74:8080'] });
+async function scrape (searchKey) {
+    // const browser = await puppeteer.launch({args: ['--no-sandbox', '--disable-setuid-sandbox', '--blink-settings=imagesEnabled=false']});
+    // const browser = await puppeteer.launch({headless: false, slowMo: 100});
+    const browser = await puppeteer.launch({slowMo: 100}); // need to slow down to content load
+
     const page = await browser.newPage();
-    // to bypass recaptcha use "user-agents" to generate random userAgent on each scrape
-    // await page.setUserAgent(userAgent.random().toString());
-    await page.setUserAgent(random_useragent.getRandom());
-    await page.setRequestInterception(true);
-    page.on('request', (request) => {
-        if(blockedResourceTypes.indexOf(request.resourceType()) !== -1){
-            request.abort();
-        }
-        else {
-            request.continue();
-        }
-    });
-    await page.goto(BASE_URL, {
-        waitUntil: 'networkidle2'
-    });
-    //
-    // await page.waitFor(3000);
-    const result = await page.evaluate(() => {
-        let aList = [];
-        let elements = document.querySelectorAll('#rso > .g > .rc > .r > a');
-        // console.log("elements: ",elements);
-        for (var element of elements){
-            console.log("element: ", element.href);
-            aList.push(element.href);
-        }
-        return aList;
-    });
-    // close when is done
+    // deal with navigation and page timeout, see the link
+    // https://www.checklyhq.com/docs/browser-checks/timeouts/
+    const navigationPromise =  page.waitForNavigation();
+    
+    await page.setUserAgent(userAgent.random().toString());
+    await page.goto('https://www.google.com/');
+    await navigationPromise;
+    await page.type('input[title="Search"]', searchKey, { delay: 50 });
+    await page.keyboard.press('Enter');
+    await navigationPromise;
+
+    await page.waitForSelector('a#hdtb-tls');
+    await page.click('a#hdtb-tls');
+    await page.waitForSelector('[aria-label="All results"]');
+    await page.click('[aria-label="All results"]');
+    await page.waitForSelector('ul > li#li_1');
+    await page.click('ul > li#li_1');
+    await navigationPromise;
+
+    let urls = [];
+    let hasNext = true
+    while(hasNext) {
+      const searchResults = await page.$$('#rso > .g > .rc > .r > a');
+      for (let result of searchResults) {
+        let url = await (await result.getProperty('href')).jsonValue();
+        // console.log(url);
+        urls.push(url);
+      }
+      let nextLink = await page.$('a[id="pnnext"]');
+      if (nextLink !== null) {
+          await nextLink.click();
+          await page.waitForNavigation();
+      } else {
+          hasNext = false;
+      }
+    }
     await browser.close();
-    return result;
+    return urls;
 };
 
 // ROUTES
@@ -146,32 +223,16 @@ app.get('/', function (req, res) {
 app.post('/api', async function (req, res) {
     req.setTimeout(0);
     let searchKey = req.body.searchKey || "";
-    let startResultNumber = 0;
-    //
-    let result = [{ url: '', status: '' }];
-    let allResult = [];
-    let tryLoop = async () => {
-        while (result.length) {
-            //
-            await scrape(searchKey, startResultNumber)
-            .then((resultArr)=>{
-                forLoop(resultArr)
-                .then(resultArray => {
-                    // append to all result
-                    console.log("resultArray", resultArray);
-                    allResult = [...allResult,...resultArray];
-                    // loop control
-                    result = [...resultArray];
-                    // result = []; // test loop once
-                    startResultNumber=startResultNumber+10;
-                })
-            }).catch(() => {});
-        }
-        return allResult;
-    }
-    tryLoop()
-    .then((rlist) => {
-        console.log('list end: ', rlist);
-        res.send(removeDuplicateResult(rlist));
+    const urls = await scrape(searchKey);
+    // console.log(urls);
+    // res.send(urls);
+    urlLoop(urls)
+    .then((resultArray) => {
+        // console.log(resultArray);
+        // res.send(resultArray);
+        res.send(removeDuplicateResult(resultArray));
+    })
+    .catch((err)=>{
+        console.error(err)
     });
 });

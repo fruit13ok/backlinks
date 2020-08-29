@@ -111,3 +111,27 @@ https://github.com/intoli/user-agents
 
 // next version I will try "find / click the next button, until no more next button"
 
+https://www.google.com/search?q=%22homemade+souffle+pancake%22
+
+
+
+////////////////////// fixed fetch problems ///////////////////////
+// related to url load forever
+// https://repl.it/@fruit13ok/fetchproblem
+
+// related to node version, Hostname/IP doesn't match certificate's altnames
+// add this line of code
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = false;
+
+// related to localhost, getaddrinfo ENOTFOUND
+// need to edit etc/hosts files with these lines
+sudo vi /etc/hosts
+127.0.0.1       localhost
+255.255.255.255 broadcasthost
+::1             localhost
+fe80::1%lo0     localhost
+
+/////////////////// this version overview ///////////////////
+-took care off recaptcha by not using url parameter to search,
+-took care off many request cases,
+-same search will cause url status codes '408 Request Timeout' on good links,
