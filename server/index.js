@@ -90,7 +90,7 @@ const tohttps = (url) => {
 const urlLoop = async (urls) => {
     // wait for non-responsive url for at least 1 second, 
     // less than that could mistreat good url
-    let waitTime = 10000;
+    let waitTime = 5000;
     setTimeout(() => { controller.abort(); }, waitTime);
     // check URL status code return array of fetches promise
     let checkUrl = urls.map(url => fetch(tohttps(url), {
