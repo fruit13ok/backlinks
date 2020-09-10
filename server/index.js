@@ -52,6 +52,20 @@ app.listen(port, () => {
 
 // helper functions
 
+// return links from current page, use in a loop to accumulate all page links
+// fix short for result problem, 
+// by convert for loop to async function to wait
+const forLoop = async (sResults) => {
+    var tempArr=[];
+    for (let result of sResults) {
+        let url = await (await result.getProperty('href')).jsonValue();
+        console.log(url);
+        // urls.push(url);
+        tempArr.push(url);
+    }
+    return tempArr;
+}
+
 // convert to start with https://
 const tohttps = (url) => {
     let newurl;
@@ -76,7 +90,7 @@ const tohttps = (url) => {
 const urlLoop = async (urls) => {
     // wait for non-responsive url for at least 1 second, 
     // less than that could mistreat good url
-    let waitTime = 10000;
+    let waitTime = 5000;
     setTimeout(() => { controller.abort(); }, waitTime);
     // check URL status code return array of fetches promise
     let checkUrl = urls.map(url => fetch(tohttps(url), {
@@ -167,9 +181,11 @@ let removeDuplicateResult = (allResult) => {
 
 // scrape
 async function scrape (searchKey) {
-    // const browser = await puppeteer.launch({args: ['--no-sandbox', '--disable-setuid-sandbox', '--blink-settings=imagesEnabled=false']});
+    const blockedResourceTypes = ['image','media','font','stylesheet'];
+    // const browser = await puppeteer.launch({args: ['--no-sandbox', '--disable-setuid-sandbox', '--blink-settings=imagesEnabled=false'], slowMo: 100});
     // const browser = await puppeteer.launch({headless: false, slowMo: 100});
-    const browser = await puppeteer.launch({slowMo: 100}); // need to slow down to content load
+    const browser = await puppeteer.launch({headless: false, slowMo: 100});
+    // const browser = await puppeteer.launch({slowMo: 100}); // need to slow down to content load
 
     const page = await browser.newPage();
     // deal with navigation and page timeout, see the link
@@ -177,9 +193,21 @@ async function scrape (searchKey) {
     const navigationPromise =  page.waitForNavigation();
     
     await page.setUserAgent(userAgent.random().toString());
+
+    await page.setRequestInterception(true);
+    page.on('request', (request) => {
+        if(blockedResourceTypes.indexOf(request.resourceType()) !== -1){
+            request.abort();
+        }
+        else {
+            request.continue();
+        }
+    });
+
     await page.goto('https://www.google.com/');
     await navigationPromise;
     await page.type('input[title="Search"]', searchKey, { delay: 50 });
+    // await page.type('input[title="Search"]', searchKey);
     await page.keyboard.press('Enter');
     await navigationPromise;
 
@@ -191,22 +219,22 @@ async function scrape (searchKey) {
     await page.click('ul > li#li_1');
     await navigationPromise;
 
+    let counter = 0;
     let urls = [];
     let hasNext = true
     while(hasNext) {
-      const searchResults = await page.$$('#rso > .g > .rc > .r > a');
-      for (let result of searchResults) {
-        let url = await (await result.getProperty('href')).jsonValue();
-        // console.log(url);
-        urls.push(url);
-      }
-      let nextLink = await page.$('a[id="pnnext"]');
-      if (nextLink !== null) {
-          await nextLink.click();
-          await page.waitForNavigation();
-      } else {
-          hasNext = false;
-      }
+        console.log(counter);
+        counter++;
+        const searchResults = await page.$$('#rso > .g > .rc > .r > a');
+        // need to convert for loop to async function to wait
+        urls.push(...await forLoop(searchResults));
+        let nextLink = await page.$('a[id="pnnext"]');
+        if (nextLink !== null) {
+            await nextLink.click();
+            await page.waitForNavigation();
+        } else {
+            hasNext = false;
+        }
     }
     await browser.close();
     return urls;
