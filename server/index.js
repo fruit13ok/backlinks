@@ -59,9 +59,11 @@ const forLoop = async (sResults) => {
     var tempArr=[];
     for (let result of sResults) {
         let url = await (await result.getProperty('href')).jsonValue();
-        console.log(url);
+        let aText = await result.$eval('h3', i => i.innerText);
+        // console.log(url);
+        // console.log(aText);
         // urls.push(url);
-        tempArr.push(url);
+        tempArr.push({url: url, aText: aText});
     }
     return tempArr;
 }
@@ -93,50 +95,60 @@ const urlLoop = async (urls) => {
     let waitTime = 5000;
     setTimeout(() => { controller.abort(); }, waitTime);
     // check URL status code return array of fetches promise
-    let checkUrl = urls.map(url => fetch(tohttps(url), {
-        signal: controller.signal,
-        agent: agent
-      })
-      .then(function(response) {
-        if (response.status.toString() == '999') {
-            return {url: url, status: '999 not permit scanning'};
-        }
-        else {
-            return {url: url, status: response.status.toString()};
-        }
-      })
-      .catch(function(error) {
-        if (error.name === 'AbortError') {
-            // console.log('Got AbortError', url)
-            return {url: url, status: "408 Request Timeout"};
-        }
-        else if (error.name === 'FetchError' && error.code === 'EPROTO'){
-            // console.log('Got FetchError', url)
-            return {url: url, status: "200 http only"};
-        }
-        else if (error.name === 'FetchError' && error.code === 'ECONNRESET'){
-            // console.log('Got FetchError', url)
-            return {url: url, status: "408 Connection Reset"};
-        }
-        else if (error.name === 'FetchError' && error.code === 'ECONNREFUSED'){
-            // console.log('Got FetchError', url)
-            return {url: url, status: "503 Service Unavailable"};
-        }
-        else if (error.name === 'FetchError' && error.code === 'ENOTFOUND'){
-            // console.log('Got FetchError', url)
-            return {url: url, status: "404 Not Found"};
-        }
-        else if (error.name === 'TypeError' || error.name === 'TypeError [ERR_INVALID_PROTOCOL]'){
-            // console.log('Got TypeError', url)
-            return {url: url, status: "200"};
-        }
-        else {
-            console.log("my error:",error);
-            // console.log("my url:",url);
-            throw error;
-        }
-      })
-    );
+    // let checkUrl = urls.map(url => fetch(tohttps(url), {
+        // for(const e of urls){
+        //     console.log('--',e.url);
+        // }
+
+    // let checkUrl = urls.map(e => fetch(tohttps(e.url), {
+    //         signal: controller.signal,
+    //         agent: agent
+    //     })
+    let checkUrl = urls.map(e => {
+        return fetch(tohttps(e.url), {
+            signal: controller.signal,
+            agent: agent
+        })
+        .then(function(response) {
+            if (response.status.toString() == '999') {
+                return {url: e.url, status: '999 not permit scanning', anchorText: e.aText};
+            }
+            else {
+                return {url: e.url, status: response.status.toString(), anchorText: e.aText};
+            }
+        })
+        .catch(function(error) {
+            if (error.name === 'AbortError') {
+                // console.log('Got AbortError', e.url);
+                return {url: e.url, status: "408 Request Timeout", anchorText: e.aText};
+            }
+            else if (error.name === 'FetchError' && error.code === 'EPROTO'){
+                // console.log('Got FetchError', e.url);
+                return {url: e.url, status: "200 http only", anchorText: e.aText};
+            }
+            else if (error.name === 'FetchError' && error.code === 'ECONNRESET'){
+                // console.log('Got FetchError', e.url);
+                return {url: e.url, status: "408 Connection Reset", anchorText: e.aText};
+            }
+            else if (error.name === 'FetchError' && error.code === 'ECONNREFUSED'){
+                // console.log('Got FetchError', e.url);
+                return {url: e.url, status: "503 Service Unavailable", anchorText: e.aText};
+            }
+            else if (error.name === 'FetchError' && error.code === 'ENOTFOUND'){
+                // console.log('Got FetchError', e.url);
+                return {url: e.url, status: "404 Not Found", anchorText: e.aText};
+            }
+            else if (error.name === 'TypeError' || error.name === 'TypeError [ERR_INVALID_PROTOCOL]'){
+                // console.log('Got TypeError', e.url);
+                return {url: e.url, status: "200", anchorText: e.aText};
+            }
+            else {  // new future unidentify error
+                console.log("my error:",error);
+                // console.log("my url:",e.url);
+                throw error;
+            }
+        })
+    });
     // loop over array of all promises resolves them, 
     // return single promise as array result
     let results = await Promise.all(checkUrl);
@@ -212,6 +224,7 @@ async function scrape (searchKey) {
     await navigationPromise;
 
     await page.waitForSelector('a#hdtb-tls');
+
     await page.click('a#hdtb-tls');
     await page.waitForSelector('[aria-label="All results"]');
     await page.click('[aria-label="All results"]');
@@ -226,8 +239,14 @@ async function scrape (searchKey) {
         console.log(counter);
         counter++;
         const searchResults = await page.$$('#rso > .g > .rc > .r > a');
+        // const searchResults = await page.$$('#rso > .g > .rc .yuRUbf > a');
         // need to convert for loop to async function to wait
-        urls.push(...await forLoop(searchResults));
+        // urls.push(...await forLoop(searchResults));  // old just array of url
+        // urls.push(...await (await forLoop(searchResults)).map(result=>result.url));  // ugly
+        const arrObj = await forLoop(searchResults);
+        // const arrUrl = await arrObj.map(result=>result.url);
+        // await urls.push(...arrUrl);
+        await urls.push(...arrObj);
         let nextLink = await page.$('a[id="pnnext"]');
         if (nextLink !== null) {
             await nextLink.click();

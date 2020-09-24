@@ -135,6 +135,7 @@ fe80::1%lo0     localhost
 -took care off recaptcha by not using url parameter to search,
 -took care off many request cases,
 -same search will cause url status codes '408 Request Timeout' on good links,
+https://pro.pureatio.com/javascript/puppeteer/contents/scraping.html
 
 
 //////////////////////////////////////////////////////
