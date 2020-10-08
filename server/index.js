@@ -55,13 +55,13 @@ app.listen(port, () => {
 // return links from current page, use in a loop to accumulate all page links
 // fix short for result problem, 
 // by convert for loop to async function to wait
-const forLoop = async (sResults) => {
+const forLoop = async (resultElements) => {
     var tempArr=[];
-    for (let result of sResults) {
-        let url = await (await result.getProperty('href')).jsonValue();
-        let aText = await result.$eval('h3', i => i.innerText);
-        // console.log(url);
-        // console.log(aText);
+    for (let resultElement of resultElements) {
+        let url = await (await resultElement.getProperty('href')).jsonValue();
+        let aText = await resultElement.$eval('h3', i => i.innerText);
+        console.log(url);
+        console.log(aText);
         // urls.push(url);
         tempArr.push({url: url, aText: aText});
     }
@@ -194,8 +194,7 @@ let removeDuplicateResult = (allResult) => {
 // scrape
 async function scrape (searchKey) {
     const blockedResourceTypes = ['image','media','font','stylesheet'];
-    // const browser = await puppeteer.launch({args: ['--no-sandbox', '--disable-setuid-sandbox', '--blink-settings=imagesEnabled=false'], slowMo: 100});
-    // const browser = await puppeteer.launch({headless: false, slowMo: 100});
+    // const browser = await puppeteer.launch({args: ['--no-sandbox', '--disable-setuid-sandbox', '--blink-settings=imagesEnabled=false'], slowMo: 100});   // this might not work
     const browser = await puppeteer.launch({headless: false, slowMo: 100});
     // const browser = await puppeteer.launch({slowMo: 100}); // need to slow down to content load
 
@@ -226,24 +225,32 @@ async function scrape (searchKey) {
     await page.waitForSelector('a#hdtb-tls');
 
     await page.click('a#hdtb-tls');
-    await page.waitForSelector('[aria-label="All results"]');
-    await page.click('[aria-label="All results"]');
+    await navigationPromise;
+    // google updated their code no longer click on dropdown list by label
+    // await page.waitForSelector('div[aria-label="All results"]');
+    // await page.click('div[aria-label="All results"]');
+    // new way to select and click on dropdown list, by xpath
+    // select in chrome with $x("//div[contains(text(), 'All results')]")
+    const elements = await page.$x("//div[contains(text(), 'All results')]");
+    await elements[0].click();
     await page.waitForSelector('ul > li#li_1');
     await page.click('ul > li#li_1');
     await navigationPromise;
 
-    let counter = 0;
+    let pageNum = 0;
     let urls = [];
     let hasNext = true
     while(hasNext) {
-        console.log(counter);
-        counter++;
-        const searchResults = await page.$$('#rso > .g > .rc > .r > a');
-        // const searchResults = await page.$$('#rso > .g > .rc .yuRUbf > a');
+        console.log(pageNum);
+        pageNum++;
+        // google updated their code no longer select DOM like this
+        // const arrOfElements = await page.$$('#rso > .g > .rc > .r > a');
+        const arrOfElements = await page.$$('div.yuRUbf > a');
+        // const arrOfElements = await page.$$('#rso > .g > .rc .yuRUbf > a');
         // need to convert for loop to async function to wait
-        // urls.push(...await forLoop(searchResults));  // old just array of url
-        // urls.push(...await (await forLoop(searchResults)).map(result=>result.url));  // ugly
-        const arrObj = await forLoop(searchResults);
+        // urls.push(...await forLoop(arrOfElements));  // old just array of url
+        // urls.push(...await (await forLoop(arrOfElements)).map(result=>result.url));  // ugly
+        const arrObj = await forLoop(arrOfElements);
         // const arrUrl = await arrObj.map(result=>result.url);
         // await urls.push(...arrUrl);
         await urls.push(...arrObj);

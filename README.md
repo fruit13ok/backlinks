@@ -19,6 +19,16 @@
 1. When automate scrape, either headless or headful I slow down Puppeteer operations by 0.1 second (see "slowMo" variable). If I don't slow it down contents don't have enough time to load before I can read them. When automate keyboard input it is good to wait a bit before next operations, I wait for 0.05 second after typing (see "delay" variable). When automation might need to way for content load alomost always need to wait until the content loaded (see "waitForNavigation" call function).
 2. After scraped all backlinks, check status by request each of them. If url not response immediately, I will wait for 5 seconds (see "waitTime" variable) before treat as request timeout exception. It seen wait longer than 5 second will have less timeout links.
 
+# To install package
+npm i
+
+# To run
+1. npm run start-dev
+2. open chrome to http://localhost:8000/ and open devtool
+3. after the page loaded, click search button
+4. there should be a popup of chrome doing search by itself
+5. while wait the the automation / scrape, look at the coding editor's terminal to see the log
+6. if nothing happen, fail, or said some node not found, in terminal crtl-c to stop the run, run again, refresh http://localhost:8000/
 
 
 
